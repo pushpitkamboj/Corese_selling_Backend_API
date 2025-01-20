@@ -3,10 +3,13 @@ import userMiddleware from "../middleware/user";
 import { z } from "zod";
 import jwt from 'jsonwebtoken'
 import dotenv from "dotenv";
-import bcrypt from "bcrypt";
 dotenv.config();
 
-const SECRET_KEY = process.env.SECRET_KEY!;
+if (!process.env.SECRET_KEY) {
+    throw new Error("Environment variable SECRET_KEY must be defined");
+}
+
+const SECRET_KEY = process.env.SECRET_KEY;
 const router = Router();
 
 import {User, Course} from "../db"
@@ -16,18 +19,8 @@ const signupSchema = z.object({
     password: z.string().min(8, {message: "password must be at least 8 characters long"})
 })
 
-function signin_jwt(username: string, password: string) {
 
-    const signature = jwt.sign({
-        username
-    }, SECRET_KEY);
-
-    return signature;
-
-}
-// Admin Routes
 router.post('/signup', async (req: Request, res: Response) => {
-    // Implement admin signup logic
     const { username, password } = req.body;
 
     const check = signupSchema.safeParse({
@@ -36,13 +29,11 @@ router.post('/signup', async (req: Request, res: Response) => {
     })
     
     if (!check.success) {
-        // Extract detailed validation errors from Zod
         const errors = check.error.issues.map(issue => issue.message).join(", ");
         res.status(400).json({ message: errors });
         return;
     }
 
-    // Check if username exists
     const existingUser = await User.findOne({ username })
 
     if (existingUser)  {
@@ -72,7 +63,7 @@ router.post('/login', async (req: Request, res: Response) => {
     if (user) {
         const token = jwt.sign({
             username
-        }, SECRET_KEY)
+        }, SECRET_KEY, {expiresIn: '1h'})
 
         res.json({
             token
@@ -85,7 +76,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     
 })
-router.get('/courses', async (req, res) => {
+router.get('/courses', async (req: Request, res: Response) => {
     const allCourses = await Course.find({});
     res.json({
         message: "all courses showed successfully",
@@ -93,21 +84,21 @@ router.get('/courses', async (req, res) => {
     })    
 });
 
-router.post('/courses/:courseId', userMiddleware, async(req, res) => {
-    // Implement course purchase logic
-    const courseId = req.params.courseId;
-    const name_user = req.headers.username;
+router.post('/courses/:courseId', userMiddleware, async (req: Request, res: Response) => {
+    const courseId = (req as any).params.courseId;
+    const name_user = (req as any).user.username; //took from user middleware
     
     const user = await User.findOne({ username: name_user });
 
-    if (Array.isArray(user.purchasedCourse)) {
+    if (user && Array.isArray(user.purchasedCourse)) {
         if (user.purchasedCourse.includes(courseId)) {
             res.json({
-                message: "the course is already purchased by you"
-            })
+                message: "The course is already purchased by you"
+            });
             return;
         }
     }
+    
 
         const result = await User.updateOne({
         username: name_user
@@ -130,17 +121,19 @@ router.post('/courses/:courseId', userMiddleware, async(req, res) => {
 
 });
 
-router.get('/purchasedCourse', userMiddleware, async (req, res) => {
-    // Implement fetching purchased courses logic
+router.get('/purchasedCourse', async (req: Request, res: Response) => {
+
     const user = await User.findOne({
-        username: req.headers.username
+        username: (req as any).user.username 
     });
 
+    if (user) {
     const courses = await Course.find({
-        _id: {
-            "$in": user.purchasedCourse
-        }
+        _id: { 
+            $in: user.purchasedCourse 
+        },
     });
+
     if (!courses) {
         res.json({
             message: "the user has not purchased any courses"
@@ -149,6 +142,11 @@ router.get('/purchasedCourse', userMiddleware, async (req, res) => {
     res.json({
         courses: courses
     })
+    } else {
+        res.json({
+            message: "the user doesnt exist"
+        })
+    }
 });
 
 export default router;

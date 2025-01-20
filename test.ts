@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const MONGO_URI = 'mongodb+srv://pushpit:pushpitkamboj@cluster0.tds00.mongodb.net/';
+const MONGO_URI = process.env.MONGO_URL!;
 
 // Connect to MongoDB
 mongoose

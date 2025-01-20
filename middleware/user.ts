@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import jwt, {JwtPayload} from "jsonwebtoken";
 import { decode } from "punycode";
+import dotenv from "dotenv"
+dotenv.config()
 
 const SECRET_KEY = process.env.SECRET_KEY!;
 
@@ -31,6 +33,8 @@ function userMiddleware(req: Request, res:Response, next: NextFunction) {
 
         // Ensure the token contains the required `username` field
         if (decoded && decoded.username) {
+            (req as any).user = decoded
+            console.log(decoded)
             next(); // Proceed to the next middleware
         } else {
              res.status(403).json({
